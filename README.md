@@ -1,4 +1,4 @@
-Basic 3D render engine
+Features wireframe views of 3D models and rudimentary physics.
 
 ![image_329](https://github.com/Nam-H-Pham/3D_Render_Engine/assets/95603897/90e29d0e-a8c6-48ce-ad61-afbd805bb692)
 
