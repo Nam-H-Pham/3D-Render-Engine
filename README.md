@@ -1,6 +1,6 @@
 # 3D Physics & Render Engine
 
-## Features a ray tracing <br>
+## Features ray tracing <br>
 ![Plant Render](https://github.com/Nam-H-Pham/3D_Render_Engine/assets/95603897/c9c418cb-abcf-42f8-bc0e-db6e34e1df39)
 
 ## Wireframe views of 3D models<br>
