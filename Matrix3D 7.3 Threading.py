@@ -2,6 +2,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 import matplotlib.image
 from tqdm import tqdm
+import threading
 
 class Point3D:
     def __init__(self, x, y, z):
@@ -255,7 +256,7 @@ class Camera:
         self.create_center(screen)
 
     def create_center(self, screen) -> None:
-        self.center = np.array([self.screen.get_width() / 2, self.screen.get_height()*3 / 4])
+        self.center = np.array([self.screen.get_width() / 2, self.screen.get_height()*3/ 4])
 
     def get_axis_index(self, axis: str) -> int:
         if axis == 'x':
@@ -291,30 +292,71 @@ class Camera:
                     pygame.draw.line(self.screen, colour, self.get_projection(shape.points[i]), self.get_projection(shape.points[j]))
 
     def trace_pixels(self, world, shape: Shape3D) -> None:
-        total_tris = len(shape.tris)
-        
         image_distance_data = np.zeros((self.screen.get_width(), self.screen.get_height())) # distance
         image_data = np.zeros((self.screen.get_width(), self.screen.get_height())) # rgb
 
-        largest_distance = 0
-        min_distance = 0
+        tri_bounds = []
+        for tri in shape.tris:
+            lowest_x = min([self.get_projection(point)[0] for point in tri])
+            highest_x = max([self.get_projection(point)[0] for point in tri])
+            lowest_y = min([self.get_projection(point)[1] for point in tri])
+            highest_y = max([self.get_projection(point)[1] for point in tri])
+            tri_bounds.append((lowest_x, highest_x, lowest_y, highest_y))
 
-        total = self.screen.get_width() * self.screen.get_height()
-        for x, y in tqdm(np.ndindex(image_distance_data.shape), desc="Processing", unit="iteration"):
-                in_world_loc = world.camera_pixel_in_world(x, y)
+        in_world_locs = np.zeros((self.screen.get_width(), self.screen.get_height(), 3)) # Camera pixel in world
+        for x in range(self.screen.get_width()):
+            for y in range(self.screen.get_height()):
+                in_world_locs[x][y] = world.camera_pixel_in_world(x, y)
 
-                for tri in shape.tris:
-                    intersection_point = self.ray_triangle_intersection(in_world_loc, np.array([0, 0, -1]), tri)
-                    if intersection_point is not None:
-                        distance = np.linalg.norm(in_world_loc - intersection_point)
-                    
-                        if image_distance_data[x][y] == 0 or distance < image_distance_data[x][y]:
-                            largest_distance = max(largest_distance, distance)
-                            min_distance = min(min_distance, distance) if min_distance != 0 else distance
-                            image_distance_data[x][y] = distance
+        def render_thread(self, world, shape: Shape3D, image_distance_data, image_data, x_portion_start, x_portion_end, y_portion_start, y_portion_end):
+            for x in tqdm(range(x_portion_start, x_portion_end), desc="Processing", unit="iteration", total=x_portion_end - x_portion_start, mininterval=0.5):
+                for y in range(y_portion_start, y_portion_end):
 
-        print('100.00%')
+                    for i in range(len(shape.tris)):
+                        lowest_x, highest_x = tri_bounds[i][0], tri_bounds[i][1]
+                        lowest_y, highest_y = tri_bounds[i][2], tri_bounds[i][3]
 
+                        if lowest_x > x_portion_end or highest_x < x_portion_start or lowest_y > y_portion_end or highest_y < y_portion_start:
+                            continue
+
+                        tri = shape.tris[i]
+
+                        intersection_point = self.ray_triangle_intersection(in_world_locs[x][y], np.array([0, 0, -1]), tri)
+                        if intersection_point is not None:
+                            distance = np.linalg.norm(in_world_locs[x][y] - intersection_point)
+                        
+                            if image_distance_data[x][y] == 0 or distance < image_distance_data[x][y]:
+                                largest_and_min_distances[0] = max(largest_and_min_distances[0], distance)
+                                largest_and_min_distances[1] = min(largest_and_min_distances[1], distance) if largest_and_min_distances[1] != 0 else distance
+                                image_distance_data[x][y] = distance
+
+        largest_and_min_distances = [0, 0]
+        slices = self.screen.get_width()//80
+        x_portion_size = self.screen.get_width() // slices
+        x_portions = [(i * x_portion_size, (i+1) * x_portion_size) for i in range(slices)]
+        x_portions[-1] = (x_portions[-1][0], self.screen.get_width())
+
+        y_portion_size = self.screen.get_height() // slices
+        y_portions = [(i * y_portion_size, (i+1) * y_portion_size) for i in range(slices)]
+        y_portions[-1] = (y_portions[-1][0], self.screen.get_height())
+        
+        threads = []
+
+        for x in range(slices):
+            for y in range(slices):
+                x_portion_start, x_portion_end = x_portions[x]
+                y_portion_start, y_portion_end = y_portions[y]
+                thread = threading.Thread(target=render_thread, args=(self, world, shape, image_distance_data, image_data, x_portion_start, x_portion_end, y_portion_start, y_portion_end))
+                thread.start()
+                threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+        print(">> Render Complete")
+
+        largest_distance = largest_and_min_distances[0]
+        min_distance = largest_and_min_distances[1]
         for x in range(self.screen.get_width()):
             for y in range(self.screen.get_height()):
                 if image_distance_data[x][y] != 0:
@@ -323,6 +365,7 @@ class Camera:
 
         image_data = np.rot90(image_data, 3)
         image_data = np.flip(image_data, 1)
+        image_data = 255 - image_data
         matplotlib.image.imsave('test.png', image_data, cmap='gray')
 
 
@@ -418,18 +461,19 @@ def shape_from_obj(file_name: str) -> Shape3D:
                         vertex1 = int(line[3].split('/')[0]) - 1
                         vertex2 = int(line[0].split('/')[0]) - 1
                         vertex3 = int(line[1].split('/')[0]) - 1
+                        shape.create_tri(points[vertex1], points[vertex2], points[vertex3])
     return shape
 
 import pygame
 
 pygame.init()
-screen = pygame.display.set_mode((100, 200), pygame.RESIZABLE)
+screen = pygame.display.set_mode((300, 300), pygame.RESIZABLE)
 pygame.display.set_caption('3D Matrix')
 clock = pygame.time.Clock()
 
 w = World(screen)
 
-object = shape_from_obj('eb_house_plant_01.obj')
+object = shape_from_obj('plant.obj')
 #object = create_rect_prism(0.5, 0.5, 0.5, 1, 1, 1)
 w.add_shape(object)
 
