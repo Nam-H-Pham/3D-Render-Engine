@@ -1,9 +1,11 @@
 # 3D Physics & Render Engine
 
 ## Features ray tracing <br>
-![Plant Render](https://github.com/Nam-H-Pham/3D_Render_Engine/assets/95603897/c9c418cb-abcf-42f8-bc0e-db6e34e1df39)
+![image_335](https://github.com/Nam-H-Pham/3D_Render_Engine/assets/95603897/054ce2ed-bee7-4b92-8d6a-73f55532a933)
+![Plant Invert](https://github.com/Nam-H-Pham/3D_Render_Engine/assets/95603897/7efa97ac-e3b9-4ad6-9404-b7591b97c50b)
 
-## Wireframe views of 3D models<br>
+
+## Real time wireframe views<br>
 
 ![image_329](https://github.com/Nam-H-Pham/3D_Render_Engine/assets/95603897/90e29d0e-a8c6-48ce-ad61-afbd805bb692)
 
