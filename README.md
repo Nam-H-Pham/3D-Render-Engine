@@ -2,6 +2,7 @@
 
 ## Features ray tracing <br>
 ![Plant Invert](https://github.com/Nam-H-Pham/3D_Render_Engine/assets/95603897/449c2943-edf3-4054-b867-a1e7c9045a84)
+![image_341](https://github.com/Nam-H-Pham/3D_Render_Engine/assets/95603897/016ba097-7842-41ab-93de-d17bbbd3e3f2)
 ![image_340](https://github.com/Nam-H-Pham/3D_Render_Engine/assets/95603897/2fea187d-6c0e-478a-a0f2-d4a32537a208)
 
 ## Real time wireframe views<br>
