@@ -43,7 +43,7 @@ class Point3D:
 
 
 class Shape3D(ABC):
-    def __init__(self, points: list, colour=(255,255,255)) -> None:
+    def __init__(self, points: list = [], colour=(255,255,255)) -> None:
         self.points = points
         self.colour = colour
         self.connection_matrix = np.zeros((len(points), len(points)))
@@ -154,6 +154,7 @@ class World:
         self.create_grid(5, 10)
         self.screen = screen
         self.ray_tracing = False
+        self.fill_faces = True
 
         self.world_center = Point3D(0, 0, 0)
         self.world_directions = [Point3D(1, 0, 0), Point3D(0, 1, 0), Point3D(0, 0, 1)]
@@ -211,11 +212,13 @@ class World:
             camera.draw_point(point)
             pygame.draw.line(self.screen , colour, camera.get_projection(self.world_center), camera.get_projection(point))
 
-        for shape in self.shapes:
-            camera.draw_shape(shape)
-            if self.ray_tracing:
-                camera.trace_pixels(self, shape)
-                self.ray_tracing = False
+        if self.ray_tracing:
+            camera.trace_pixels(self)
+            self.ray_tracing = False
+        else:
+            camera.draw_shape_edges(self)
+            if self.fill_faces:
+                camera.draw_shape_faces(self)
 
     def create_plane(self, x: float, y: float, z: float, width: float, height: float) -> Shape3D:
         points = []
@@ -285,6 +288,10 @@ class Camera:
         x, y = self.get_projection(point)
         pygame.draw.circle(self.screen, colour, (x, y), 1)
 
+    def draw_shape_edges(self, world) -> None:
+        for shape in world.shapes:
+            self.draw_shape(shape)
+
     def draw_shape(self, shape: Shape3D) -> None:
         colour = shape.colour
         for point in shape.points:
@@ -294,7 +301,37 @@ class Camera:
                 if shape.connection_matrix[i][j] == 1:
                     pygame.draw.line(self.screen, colour, self.get_projection(shape.points[i]), self.get_projection(shape.points[j]))
 
-    def trace_pixels(self, world, shape: Shape3D) -> None:
+    def draw_shape_faces(self, world) -> None:
+        complete_shape = Shape3D()
+        for shape in world.shapes:
+            for point in shape.points:
+                complete_shape.points.append(point)
+            complete_shape.tris = complete_shape.tris + shape.tris
+
+        shape = complete_shape
+
+        tris_and_depths = []
+        for tri in shape.tris:
+            depth = np.mean([point.loc[2] for point in tri])
+            tris_and_depths.append((tri, depth))
+
+        tris_and_depths = sorted(tris_and_depths, key=lambda x: x[1])
+        farthest_depth = tris_and_depths[0][1]
+        closest_depth = tris_and_depths[-1][1]
+        for tri, depth in tris_and_depths:
+            intensity = 255 - (depth - closest_depth) / (farthest_depth - closest_depth) * 255
+            colour = (intensity, intensity, intensity)
+            pygame.draw.polygon(self.screen, colour, [self.get_projection(point) for point in tri])
+
+    def trace_pixels(self, world) -> None:
+        complete_shape = Shape3D()
+        for shape in world.shapes:
+            for point in shape.points:
+                complete_shape.points.append(point)
+            complete_shape.tris = complete_shape.tris + shape.tris
+
+        shape = complete_shape
+
         image_distance_data = np.zeros((self.screen.get_width(), self.screen.get_height())) # distance
         image_data = np.zeros((self.screen.get_width(), self.screen.get_height())) # rgb
 
@@ -368,7 +405,6 @@ class Camera:
 
         image_data = np.rot90(image_data, 3)
         image_data = np.flip(image_data, 1)
-        image_data = 255 - image_data
         matplotlib.image.imsave('test.png', image_data, cmap='gray')
 
 
@@ -433,6 +469,17 @@ def create_rect_prism(x: float, y: float, z: float, width: float, height: float,
     shape.create_tri(points[1], points[0], points[4])
     return shape
 
+def create_plane(x: float, y: float, z: float, width: float, height: float) -> Shape3D:
+    points = []
+    points.append(Point3D(x, y, z))
+    points.append(Point3D(x + width, y, z))
+    points.append(Point3D(x + width, y, z + height))
+    points.append(Point3D(x, y, z + height))
+    shape = Shape3D(points)
+    shape.create_tri(points[0], points[1], points[2])
+    shape.create_tri(points[2], points[3], points[0])
+    return shape
+
 
 def shape_from_obj(file_name: str) -> Shape3D:
     points = []
@@ -475,9 +522,12 @@ clock = pygame.time.Clock()
 
 w = World(screen)
 
-object = shape_from_obj('cubone.obj')
+# object = shape_from_obj('cubone.obj')
 # object = create_rect_prism(0, 0, 0, 1, 1, 1)
-w.add_shape(object)
+# w.add_shape(object)
+
+w.add_shape(create_rect_prism(0, 0, 0, 1, 1, 1))
+w.add_shape(create_plane(-2, 0, -2, 4, 4))
 
 
 last_mouse_pos = pygame.mouse.get_pos()
@@ -529,6 +579,9 @@ while True:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 w.ray_tracing = not w.ray_tracing
+
+            elif event.key == pygame.K_f:
+                w.fill_faces = not w.fill_faces
 
     screen.fill((0, 0, 0))
 
