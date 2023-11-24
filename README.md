@@ -1,4 +1,5 @@
 # 3D Physics & Render Engine
+Python-based ray tracing engine. Implemented from the ground up using NumPy.
 
 ## Features ray tracing <br>
 ![image_348](https://github.com/Nam-H-Pham/3D-Render-Engine/assets/95603897/40d8da4f-4fd8-4d19-a797-60a76075a23f)
