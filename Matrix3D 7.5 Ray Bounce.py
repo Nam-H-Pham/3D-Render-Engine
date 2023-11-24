@@ -225,6 +225,7 @@ class Camera:
         self.ray_bounce = 1
         self.bounce_overlay_alpha = 0.2
         self.sample_reduction = 1 # 1 = no reduction, 2 = 2x2 reduction, 3 = 3x3 reduction, etc.
+        self.debug = False
 
     def create_center(self, screen) -> None:
         self.center = np.array([self.screen.get_width() / 2, self.screen.get_height()*1.5/ 4])
@@ -358,11 +359,12 @@ class Camera:
 
                     if final_pos is not None:
 
-                        # self.sample_reduction = 20
-                        # intial_to_final = final_pos - image_ray_position_data[x][y]
-                        # rayout = world.create_ray(image_ray_position_data[x][y], intial_to_final)
-                        # rayout.colour = (255 - render_pass * 50, 0,0)
-                        # world.add_shape(rayout)
+                        if self.debug:
+                            self.sample_reduction = 50
+                            intial_to_final = final_pos - image_ray_position_data[x][y]
+                            rayout = world.create_ray(image_ray_position_data[x][y], intial_to_final)
+                            rayout.colour = (255 - render_pass * 50, 0,0)
+                            world.add_shape(rayout)
 
                         image_ray_position_data[x][y] = final_pos
 
@@ -591,8 +593,10 @@ clock = pygame.time.Clock()
 
 w = World(screen)
 
-object = shape_from_obj('small plant.obj')
-w.add_shape(create_plane(-2, 0, -2, 4, 4))
+object = shape_from_obj('sphere.obj')
+object.move(np.array([2, 0, 0]))
+w.add_shape(create_rect_prism(-2, 0, -2, 8, 8, 0))
+w.add_shape(create_plane(-2, 0, -2, 8, 8))
 w.add_shape(object)
 
 # w.add_shape(create_rect_prism(0, 0, 0, 1, 1, 1))
@@ -648,10 +652,15 @@ while True:
 
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                w.ray_tracing = not w.ray_tracing
+                w.ray_tracing = True
 
             elif event.key == pygame.K_f:
                 w.fill_faces = not w.fill_faces
+
+            elif event.key == pygame.K_d:
+                w.debug = not w.debug
+                if w.debug:
+                    w.ray_tracing = True
 
     screen.fill((0, 0, 0))
 
